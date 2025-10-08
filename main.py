@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import ssl
-from urllib.parse import unquote
+from urllib.parse import unquote, parse_qs
 
 import aiohttp
 from aiogram import Bot, Dispatcher
@@ -60,6 +60,15 @@ def format_proxy_configs(content: str):
             except:
                 name = groups["name"]
 
+        # Parse query parameters to extract SNI
+        sni = ""
+        if groups["params"] and groups["params"].startswith("?"):
+            try:
+                params = parse_qs(groups["params"][1:])  # Remove leading '?'
+                sni = params.get('sni', [''])[0]
+            except:
+                pass
+
         # Build hostname:port
         host = groups["host"]
         port = groups["port"] or ""
@@ -71,12 +80,20 @@ def format_proxy_configs(content: str):
         escaped_hostname = html.escape(hostname_port)
         escaped_line = html.escape(line)
 
-        formatted_configs.append(
-            f"<b>{proxy_count}. {escaped_name}</b>\n"
-            f" <b>ID:</b> {escaped_user_id}\n"
-            f" <b>IP:</b> {escaped_hostname}\n"
-            f"<code>{escaped_line}</code>"
-        )
+        # Build the formatted output with SNI if available
+        output_lines = [
+            f"<b>{proxy_count}. {escaped_name}</b>",
+            f" <b>ID:</b> {escaped_user_id}",
+            f" <b>IP:</b> {escaped_hostname}"
+        ]
+
+        if sni:
+            escaped_sni = html.escape(sni)
+            output_lines.append(f" <b>SNI:</b> {escaped_sni}")
+
+        output_lines.append(f"<code>{escaped_line}</code>")
+
+        formatted_configs.append("\n".join(output_lines))
 
     return "\n\n".join(formatted_configs) if formatted_configs else content, proxy_count
 
