@@ -1,0 +1,13 @@
+[Unit]
+Description=Vless sub
+After=network.target
+[Service]
+User=root
+WorkingDirectory=/root/vless
+ExecStart=/root/vless/.venv/bin/python -m app
+ExecStop=/bin/kill -s SIGINT $MAINPID
+Restart=always
+KillMode=control-group
+TimeoutStopSec=10
+[Install]
+WantedBy=multi-user.target

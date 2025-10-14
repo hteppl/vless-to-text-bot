@@ -27,6 +27,7 @@ dp = Dispatcher()
 def format_proxy_configs(content: str):
     """Format proxy configurations with proper HTML formatting"""
     formatted_configs = []
+    country_list = []  # Store countries with their IPs
     proxy_count = 0
 
     # Regex to parse proxy URLs: protocol://[user@]host[:port][?params][#name]
@@ -74,8 +75,12 @@ def format_proxy_configs(content: str):
         port = groups["port"] or ""
         hostname_port = f"{host}:{port}" if port else host
 
+        # Add to country list
+        country_name = name or f"Proxy {proxy_count}"
+        country_list.append((country_name, hostname_port))
+
         # Format output
-        escaped_name = html.escape(name or f"Proxy {proxy_count}")
+        escaped_name = html.escape(country_name)
         escaped_user_id = html.escape(groups["user"] or "N/A")
         escaped_hostname = html.escape(hostname_port)
         escaped_line = html.escape(line)
@@ -95,7 +100,7 @@ def format_proxy_configs(content: str):
 
         formatted_configs.append("\n".join(output_lines))
 
-    return "\n\n".join(formatted_configs) if formatted_configs else content, proxy_count
+    return "\n\n".join(formatted_configs) if formatted_configs else content, proxy_count, country_list
 
 
 async def fetch_base64_content(url: str):
@@ -137,9 +142,16 @@ async def handle_message(message: Message):
         await sent_message.edit_text(f"❌ {html.escape(content)}")
         return
 
-    formatted_content, proxy_count = format_proxy_configs(content)
+    formatted_content, proxy_count, country_list = format_proxy_configs(content)
+
+    # Create country list summary
+    country_summary = ""
+    if country_list:
+        country_lines = [f"{html.escape(name)} {html.escape(ip)}" for name, ip in country_list]
+        country_summary = "<b>📍 Countries:</b>\n" + "\n".join(country_lines) + "\n\n"
+
     header = f"✅ Found {proxy_count} configurations:\n\n" if proxy_count else "✅ Decoded content:\n\n"
-    full_message = header + formatted_content
+    full_message = header + country_summary + formatted_content
 
     # Handle message length limits
     if len(full_message) <= 4000:
@@ -147,8 +159,9 @@ async def handle_message(message: Message):
         return
 
     # Split into chunks for long messages
-    chunk_size = 4000 - len(header) - 10
-    await sent_message.edit_text(f"{header}(Part 1)\n\n{formatted_content[:chunk_size]}")
+    header_with_countries = header + country_summary
+    chunk_size = 4000 - len(header_with_countries) - 20  # Leave room for "(Part 1)"
+    await sent_message.edit_text(f"{header_with_countries}(Part 1)\n\n{formatted_content[:chunk_size]}")
 
     remaining = formatted_content[chunk_size:]
     for i, chunk in enumerate((remaining[j : j + 4000] for j in range(0, len(remaining), 4000)), 2):
